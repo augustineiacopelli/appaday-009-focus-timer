@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>009 · Focus Timer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0d0d;
+      --surface: #141414;
+      --border: #222;
+      --work: #e8ff47;
+      --break: #47ffd4;
+      --text: #f0f0f0;
+      --muted: #555;
+      --radius: 4px;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      overflow: hidden;
+    }
+
+    /* Subtle grid texture */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    #app {
+      position: relative;
+      z-index: 1;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .app-id {
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .app-id a {
+      color: var(--muted);
+      text-decoration: none;
+    }
+
+    .app-id a:hover { color: var(--text); }
+
+    .header-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 18px;
+      letter-spacing: 0.1em;
+      color: var(--text);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .icon-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+      font-size: 14px;
+    }
+
+    .icon-btn:hover {
+      border-color: var(--text);
+      color: var(--text);
+    }
+
+    /* ── MAIN ── */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      padding: 20px;
+    }
+
+    /* Mode label */
+    .mode-label {
+      font-size: 11px;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--accent, var(--work));
+      margin-bottom: 16px;
+      transition: color 0.4s;
+    }
+
+    /* Session dots */
+    .session-dots {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 28px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      border: 1px solid var(--muted);
+      background: transparent;
+      transition: background 0.3s, border-color 0.3s;
+    }
+
+    .dot.filled {
+      background: var(--accent, var(--work));
+      border-color: var(--accent, var(--work));
+    }
+
+    .dot.active {
+      border-color: var(--accent, var(--work));
+      box-shadow: 0 0 6px var(--accent, var(--work));
+    }
+
+    /* Arc ring */
+    .ring-wrap {
+      position: relative;
+      width: min(280px, 72vw);
+      height: min(280px, 72vw);
+      margin-bottom: 32px;
+    }
+
+    .ring-wrap svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+
+    .ring-bg {
+      fill: none;
+      stroke: var(--border);
+      stroke-width: 6;
+    }
+
+    .ring-progress {
+      fill: none;
+      stroke: var(--accent, var(--work));
+      stroke-width: 6;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.9s linear, stroke 0.4s;
+    }
+
+    .ring-center {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .time-display {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(64px, 18vw, 88px);
+      line-height: 1;
+      letter-spacing: 0.04em;
+      color: var(--text);
+    }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .btn {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 0 20px;
+      height: 40px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: none;
+      color: var(--muted);
+      transition: all 0.15s;
+    }
+
+    .btn:hover {
+      border-color: var(--text);
+      color: var(--text);
+    }
+
+    .btn-primary {
+      background: var(--accent, var(--work));
+      color: #0d0d0d;
+      border-color: transparent;
+      font-weight: 500;
+      min-width: 96px;
+    }
+
+    .btn-primary:hover {
+      filter: brightness(1.1);
+      color: #0d0d0d;
+    }
+
+    .btn-primary:active { filter: brightness(0.9); }
+
+    /* ── SETTINGS PANEL ── */
+    .settings-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    .settings-overlay.open { display: flex; }
+
+    .settings-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: 8px 8px 0 0;
+      width: 100%;
+      max-width: 480px;
+      padding: 28px 24px 40px;
+      animation: slideUp 0.25s ease;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(30px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+
+    .settings-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px;
+      letter-spacing: 0.1em;
+      margin-bottom: 24px;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .setting-label {
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .stepper {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .stepper-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: border-color 0.15s;
+    }
+
+    .stepper-btn:hover { border-color: var(--text); }
+
+    .stepper-val {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 24px;
+      min-width: 40px;
+      text-align: center;
+    }
+
+    .settings-close {
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    /* ── FULLSCREEN MODE ── */
+    #app.fullscreen header,
+    #app.fullscreen .session-dots {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+
+    #app.fullscreen main {
+      justify-content: center;
+    }
+
+    #app.fullscreen .ring-wrap {
+      width: min(380px, 85vw);
+      height: min(380px, 85vw);
+    }
+
+    #app.fullscreen .time-display {
+      font-size: clamp(80px, 24vw, 112px);
+    }
+
+    /* Accent sync */
+    .accent-work  { --accent: var(--work); }
+    .accent-break { --accent: var(--break); }
+
+    /* Flash on complete */
+    @keyframes flashBg {
+      0%   { background: rgba(232,255,71,0.12); }
+      100% { background: transparent; }
+    }
+    .flash { animation: flashBg 0.6s ease; }
+    .flash-break { animation: flashBgBreak 0.6s ease; }
+    @keyframes flashBgBreak {
+      0%   { background: rgba(71,255,212,0.12); }
+      100% { background: transparent; }
+    }
+  </style>
+</head>
+<body>
+<div id="app" class="accent-work">
+
+  <header>
+    <span class="app-id"><a href="https://augustineiacopelli.github.io">appaday</a> · 009</span>
+    <span class="header-title">Focus Timer</span>
+    <div class="header-actions">
+      <button class="icon-btn" id="fullscreenBtn" title="Fullscreen" aria-label="Toggle fullscreen">⛶</button>
+      <button class="icon-btn" id="settingsBtn" title="Settings" aria-label="Open settings">⚙</button>
+    </div>
+  </header>
+
+  <main id="mainArea">
+    <div class="mode-label" id="modeLabel">Work</div>
+
+    <div class="session-dots" id="sessionDots"></div>
+
+    <div class="ring-wrap">
+      <svg viewBox="0 0 100 100">
+        <circle class="ring-bg" cx="50" cy="50" r="44" />
+        <circle class="ring-progress" id="ringProgress" cx="50" cy="50" r="44" />
+      </svg>
+      <div class="ring-center">
+        <div class="time-display" id="timeDisplay">25:00</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn" id="resetBtn">Reset</button>
+      <button class="btn btn-primary" id="startBtn">Start</button>
+      <button class="btn" id="skipBtn">Skip</button>
+    </div>
+  </main>
+
+</div>
+
+<!-- Settings -->
+<div class="settings-overlay" id="settingsOverlay">
+  <div class="settings-panel">
+    <div class="settings-title">Settings</div>
+
+    <div class="setting-row">
+      <span class="setting-label">Work (min)</span>
+      <div class="stepper">
+        <button class="stepper-btn" data-setting="work" data-dir="-1">−</button>
+        <span class="stepper-val" id="workVal">25</span>
+        <button class="stepper-btn" data-setting="work" data-dir="1">+</button>
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <span class="setting-label">Short Break (min)</span>
+      <div class="stepper">
+        <button class="stepper-btn" data-setting="shortBreak" data-dir="-1">−</button>
+        <span class="stepper-val" id="shortBreakVal">5</span>
+        <button class="stepper-btn" data-setting="shortBreak" data-dir="1">+</button>
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <span class="setting-label">Long Break (min)</span>
+      <div class="stepper">
+        <button class="stepper-btn" data-setting="longBreak" data-dir="-1">−</button>
+        <span class="stepper-val" id="longBreakVal">15</span>
+        <button class="stepper-btn" data-setting="longBreak" data-dir="1">+</button>
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <span class="setting-label">Sessions before long break</span>
+      <div class="stepper">
+        <button class="stepper-btn" data-setting="sessionsBeforeLong" data-dir="-1">−</button>
+        <span class="stepper-val" id="sessionsBeforeLongVal">4</span>
+        <button class="stepper-btn" data-setting="sessionsBeforeLong" data-dir="1">+</button>
+      </div>
+    </div>
+
+    <button class="btn btn-primary settings-close" id="settingsClose">Done</button>
+  </div>
+</div>
+
+<script>
+  // ── STATE ──────────────────────────────────────────────────────
+  const cfg = {
+    work: 25,
+    shortBreak: 5,
+    longBreak: 15,
+    sessionsBeforeLong: 4,
+  };
+
+  let phase = 'work';          // 'work' | 'shortBreak' | 'longBreak'
+  let totalSeconds = cfg.work * 60;
+  let remaining = totalSeconds;
+  let running = false;
+  let timer = null;
+  let completedSessions = 0;   // work sessions done this cycle
+  let isFullscreen = false;
+
+  // ── DOM REFS ──────────────────────────────────────────────────
+  const app           = document.getElementById('app');
+  const timeDisplay   = document.getElementById('timeDisplay');
+  const modeLabel     = document.getElementById('modeLabel');
+  const startBtn      = document.getElementById('startBtn');
+  const resetBtn      = document.getElementById('resetBtn');
+  const skipBtn       = document.getElementById('skipBtn');
+  const ringProgress  = document.getElementById('ringProgress');
+  const sessionDots   = document.getElementById('sessionDots');
+  const settingsBtn   = document.getElementById('settingsBtn');
+  const settingsOverlay = document.getElementById('settingsOverlay');
+  const settingsClose = document.getElementById('settingsClose');
+  const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+  // Ring math
+  const R = 44;
+  const CIRC = 2 * Math.PI * R;
+  ringProgress.style.strokeDasharray = CIRC;
+
+  // ── HELPERS ───────────────────────────────────────────────────
+  function fmt(s) {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+  }
+
+  function updateRing() {
+    const frac = remaining / totalSeconds;
+    ringProgress.style.strokeDashoffset = CIRC * (1 - frac);
+  }
+
+  function updateDisplay() {
+    timeDisplay.textContent = fmt(remaining);
+    document.title = `${fmt(remaining)} · ${phase === 'work' ? 'Focus' : 'Break'}`;
+    updateRing();
+  }
+
+  function buildDots() {
+    sessionDots.innerHTML = '';
+    const n = cfg.sessionsBeforeLong;
+    for (let i = 0; i < n; i++) {
+      const d = document.createElement('div');
+      d.className = 'dot';
+      if (i < completedSessions % n) d.classList.add('filled');
+      if (phase === 'work' && i === completedSessions % n) d.classList.add('active');
+      sessionDots.appendChild(d);
+    }
+  }
+
+  function setPhase(p) {
+    phase = p;
+    const isWork = p === 'work';
+    const isLong = p === 'longBreak';
+
+    app.className = isWork ? 'accent-work' : 'accent-break';
+
+    modeLabel.textContent = isWork ? 'Work' : (isLong ? 'Long Break' : 'Short Break');
+
+    totalSeconds = cfg[p] * 60;
+    remaining = totalSeconds;
+    updateDisplay();
+    buildDots();
+  }
+
+  function tick() {
+    remaining--;
+    updateDisplay();
+    if (remaining <= 0) phaseComplete();
+  }
+
+  function phaseComplete() {
+    clearInterval(timer);
+    running = false;
+    startBtn.textContent = 'Start';
+
+    // Flash
+    const flashClass = phase === 'work' ? 'flash' : 'flash-break';
+    document.getElementById('mainArea').classList.add(flashClass);
+    setTimeout(() => document.getElementById('mainArea').classList.remove(flashClass), 600);
+
+    // Notify
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(phase === 'work' ? '🍅 Work session done! Take a break.' : '⚡ Break over. Back to focus.');
+    }
+
+    if (phase === 'work') {
+      completedSessions++;
+      const goLong = completedSessions % cfg.sessionsBeforeLong === 0;
+      setPhase(goLong ? 'longBreak' : 'shortBreak');
+    } else {
+      setPhase('work');
+    }
+  }
+
+  function startStop() {
+    if (running) {
+      clearInterval(timer);
+      running = false;
+      startBtn.textContent = 'Resume';
+    } else {
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+      timer = setInterval(tick, 1000);
+      running = true;
+      startBtn.textContent = 'Pause';
+    }
+  }
+
+  function reset() {
+    clearInterval(timer);
+    running = false;
+    startBtn.textContent = 'Start';
+    remaining = totalSeconds;
+    updateDisplay();
+  }
+
+  function skip() {
+    clearInterval(timer);
+    running = false;
+    startBtn.textContent = 'Start';
+    phaseComplete();
+  }
+
+  // ── SETTINGS ─────────────────────────────────────────────────
+  const settingLimits = {
+    work: [5, 90],
+    shortBreak: [1, 30],
+    longBreak: [5, 60],
+    sessionsBeforeLong: [2, 8],
+  };
+
+  const settingDisplays = {
+    work: document.getElementById('workVal'),
+    shortBreak: document.getElementById('shortBreakVal'),
+    longBreak: document.getElementById('longBreakVal'),
+    sessionsBeforeLong: document.getElementById('sessionsBeforeLongVal'),
+  };
+
+  document.querySelectorAll('.stepper-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.setting;
+      const dir = parseInt(btn.dataset.dir);
+      const [min, max] = settingLimits[key];
+      cfg[key] = Math.min(max, Math.max(min, cfg[key] + dir));
+      settingDisplays[key].textContent = cfg[key];
+    });
+  });
+
+  settingsBtn.addEventListener('click', () => {
+    settingsOverlay.classList.add('open');
+  });
+
+  settingsClose.addEventListener('click', () => {
+    settingsOverlay.classList.remove('open');
+    // Apply new settings: restart current phase
+    clearInterval(timer);
+    running = false;
+    startBtn.textContent = 'Start';
+    setPhase(phase);
+    buildDots();
+  });
+
+  settingsOverlay.addEventListener('click', e => {
+    if (e.target === settingsOverlay) settingsClose.click();
+  });
+
+  // ── FULLSCREEN ────────────────────────────────────────────────
+  fullscreenBtn.addEventListener('click', () => {
+    isFullscreen = !isFullscreen;
+    app.classList.toggle('fullscreen', isFullscreen);
+    fullscreenBtn.textContent = isFullscreen ? '⛶' : '⛶';
+    if (document.documentElement.requestFullscreen && isFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else if (document.exitFullscreen && !isFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    }
+  });
+
+  // ── BUTTONS ───────────────────────────────────────────────────
+  startBtn.addEventListener('click', startStop);
+  resetBtn.addEventListener('click', reset);
+  skipBtn.addEventListener('click', skip);
+
+  // ── KEYBOARD ─────────────────────────────────────────────────
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT') return;
+    if (e.code === 'Space') { e.preventDefault(); startStop(); }
+    if (e.code === 'KeyR') reset();
+    if (e.code === 'KeyS') skip();
+  });
+
+  // ── INIT ─────────────────────────────────────────────────────
+  setPhase('work');
+</script>
+</body>
+</html>

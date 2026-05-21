@@ -33,3 +33,8 @@ Focus Timer runs a standard Pomodoro cycle: work sessions separated by short bre
 - [x] Keyboard shortcuts functional
 - [x] Mobile friendly at 375px viewport
 - [x] Published to GitHub Pages
+
+## Future Updates
+
+- Allow color customization
+- Figure out if there is a way to prevent app reset when not running in the foreground on iPhone
